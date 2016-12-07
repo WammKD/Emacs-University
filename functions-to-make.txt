@@ -1,0 +1,5 @@
+Assert
+
+The ability to search the code by regex
+
+The ability to check if a variable exists?
