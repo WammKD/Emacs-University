@@ -1,3 +1,5 @@
+(defconst eUni-temp-directory "/tmp/"
+  "The temporary directory to output files for interpreting code.")
 (defconst eUni-instruction-buffer-name "*Instructions*"
   "The name of the buffer/window that will hold the current instructions.")
 (defconst eUni-lesson-buffer-name "*Lesson Name*"
@@ -13,6 +15,7 @@
 
   (defun switch-erase-insert-toBeg (name contents)
     (switch-to-buffer name)
+    (setq buffer-read-only nil)
     (erase-buffer)
     (insert contents)
     (beginning-of-buffer))
@@ -26,44 +29,44 @@
 
   (other-window 1)
 
-  (switch-to-buffer eUni-evaluation-buffer-name)
+  (switch-erase-insert-toBeg eUni-evaluation-buffer-name "")
   (setq buffer-read-only t)
   (split-window-vertically (floor (* .75 (window-height))))
 
   (switch-erase-insert-toBeg eUni-lesson-buffer-name lesson)
   (ruby-mode))
 
-(defun eUni-RubyAssert (assert)
-  (message "Checking answers…")
+(defun eUni-generalAssert (append           language-file
+			   interpreted-file interpreter   outputer)
+  (setq users-work (concat
+		     (buffer-substring-no-properties (point-min) (point-max))
+		     "\n"))
 
-  (write-region
-    (concat
-      (buffer-substring-no-properties (point-min) (point-max))
-      (concat "\n\nIO.write('/tmp/crap.txt', " assert ")"))
-    nil
-    "/tmp/crap.rb")
+  (write-region (concat users-work append) nil language-file)
 
   (with-temp-buffer
-    (shell-command
-      "ruby /tmp/crap.rb"
-      t))
+    (shell-command (concat interpreter " " language-file) t))
 
-  (write-region
-    (buffer-substring-no-properties (point-min) (point-max))
-    nil
-    "/tmp/crap.rb")
+  (write-region users-work nil language-file)
 
-  (async-shell-command "irb /tmp/crap.rb" eUni-evaluation-buffer-name)
+  (message "Checking answers…")
+  (async-shell-command (concat
+			 outputer
+			 " "
+			 language-file) eUni-evaluation-buffer-name)
 
-  ;; (call-process-shell-command
-  ;;   (concat "ruby " (concat 
-  ;; 		      (buffer-substring-no-properties (point-min) (point-max))
-  ;; 		      (concat "\n\nIO.write('/tmp/crap.txt', " assert ")")))
-  ;;   nil
-  ;;   "*Shell Command Output*"
-  ;;   t)
   (string-equal
     "true"
     (with-temp-buffer
-      (insert-file-contents "/tmp/crap.txt")
+      (insert-file-contents interpreted-file)
       (buffer-string))))
+
+(defun eUni-RubyAssert (assert lesson-name)
+  (setq beginning-of-file-name (concat eUni-temp-directory lesson-name))
+
+  (eUni-generalAssert
+    (concat "\n\nIO.write('" beginning-of-file-name ".txt', " assert ")")
+    (concat                  beginning-of-file-name ".rb")
+    (concat                  beginning-of-file-name ".txt")
+    "ruby"
+    "irb"))
