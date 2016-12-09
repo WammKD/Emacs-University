@@ -11,9 +11,6 @@
 (defconst eUni-language-functions '((Ruby . eUni-RubyAssert) (Java . eUni-JavaAssert))
   "An a-list of language names and their respective assert functions.")
 
-(setq same-window-buffer-names
-  (cons eUni-evaluation-buffer-name same-window-buffer-names))
-
 (defun eUni-start (instructions lesson)
   (interactive)
 
