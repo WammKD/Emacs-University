@@ -46,7 +46,7 @@
   (cdr (assoc symbol eUni-language-functions)))
 
 (defun eUni-generalAssert-init (assert-function-symbol assert lesson-name)
-  (let (beginning-of-file-name (concat eUni-temp-directory lesson-name))
+  (let ((beginning-of-file-name (concat eUni-temp-directory lesson-name)))
     (funcall (eUni-get-language-assert-function assert-function-symbol)
 	       assert
 	       lesson-name
@@ -72,7 +72,7 @@
 	(insert-file-contents interpreted-file)
 	(buffer-string)))))
 
-(defun eUni-generalEvaluate (outputer lesson-name)
+(defun eUni-generalEvaluate (outputer lesson-name language-file-ext)
   (let* ((beginning-of-file-name (concat eUni-temp-directory          lesson-name))
 	 (language-file          (concat beginning-of-file-name language-file-ext)))
     (message "Checking answers…")
@@ -87,6 +87,7 @@
     (concat "\n\nIO.write('" interpreted-file "', " assert ")")
     beginning-of-file-name
     interpreted-file
-    ".rb"    
-    "ruby"
-    "irb"))
+    ".rb"
+    "ruby"))
+(defun eUni-RubyEvaluate (lesson-name)
+  (eUni-generalEvaluate "irb" lesson-name ".rb"))
