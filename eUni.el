@@ -1,11 +1,15 @@
 (defconst eUni-temp-directory "/tmp/"
   "The temporary directory to output files for interpreting code.")
+(defconst eUni-interpreted-file-ext ".txt"
+  "The file extention (just a .txt file) of the output of asserting something against the user's code.")
 (defconst eUni-instruction-buffer-name "*Instructions*"
   "The name of the buffer/window that will hold the current instructions.")
 (defconst eUni-lesson-buffer-name "*Lesson Name*"
   "The name of the buffer/window that will hold where the lesson will be written.")
 (defconst eUni-evaluation-buffer-name "*Evaluations*"
   "The name of the buffer/window that will hold the evaluated results of the user's code.")
+(defconst eUni-language-functions '((Ruby . eUni-RubyAssert) (Java . eUni-JavaAssert))
+  "An a-list of language names and their respective assert functions.")
 
 (setq same-window-buffer-names
   (cons eUni-evaluation-buffer-name same-window-buffer-names))
@@ -36,11 +40,12 @@
   (switch-erase-insert-toBeg eUni-lesson-buffer-name lesson)
   (ruby-mode))
 
-(defun eUni-generalAssert (append           language-file
-			   interpreted-file interpreter   outputer)
-  (setq users-work (concat
-		     (buffer-substring-no-properties (point-min) (point-max))
-		     "\n"))
+(defun eUni-generalAssert (append           beginning-of-file-name
+			   interpreted-file language-file-ext      interpreter outputer)
+  (setq language-file (concat beginning-of-file-name language-file-ext))
+  (setq users-work    (concat
+		        (buffer-substring-no-properties (point-min) (point-max))
+			"\n"))
 
   (write-region (concat users-work append) nil language-file)
 
@@ -61,12 +66,21 @@
       (insert-file-contents interpreted-file)
       (buffer-string))))
 
-(defun eUni-RubyAssert (assert lesson-name)
-  (setq beginning-of-file-name (concat eUni-temp-directory lesson-name))
+(defun eUni-generalAssert-init (assert-function-symbol assert lesson-name)
+  (funcall (eUni-get-language-assert-function assert-function-symbol)
+	     assert
+	     lesson-name
+	     (concat eUni-temp-directory lesson-name)
+	     (concat beginning-of-file-name eUni-interpreted-file-ext)))
 
+(defun eUni-get-language-assert-function (symbol)
+  (cdr (assoc symbol eUni-language-functions)))
+
+(defun eUni-RubyAssert (assert lesson-name beginning-of-file-name interpreted-file)
   (eUni-generalAssert
-    (concat "\n\nIO.write('" beginning-of-file-name ".txt', " assert ")")
-    (concat                  beginning-of-file-name ".rb")
-    (concat                  beginning-of-file-name ".txt")
+    (concat "\n\nIO.write('" interpreted-file "', " assert ")")
+    beginning-of-file-name
+    interpreted-file
+    ".rb"    
     "ruby"
     "irb"))
