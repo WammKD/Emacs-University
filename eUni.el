@@ -2,7 +2,7 @@
 
 (defconst eUni-CLASS-FILE-DELIMETER "\n######\n"
   "The delimeter to parse Emacs University class files.")
-(defconst eUni-LESSON-DIRECTORY "~/.emacs.d/emacs-university/"
+(defconst eUni-CLASSES-DIRECTORY "~/.emacs.d/emacs-university/"
   "The default directory that university lessons are kept in, under the .emacs.d directory.")
 (defconst eUni-TEMP-DIRECTORY "/tmp/"
   "The temporary directory to output files for interpreting code.")
@@ -14,9 +14,11 @@
   "The name of the buffer/window that will hold the current instructions.")
 (defconst eUni-EVALUATION-BUFFER-NAME "*Evaluations*"
   "The name of the buffer/window that will hold the evaluated results of the user's code.")
-(defconst eUni-LANGUAGE-FUNCTIONS '((Ruby . ((eUni-RubyAssert . eUni-RubyEvaluate) . enh-ruby-mode))
+(defconst eUni-LANGUAGE-FUNCTIONS '((Ruby . ((eUni-RubyAssert . eUni-RubyEvaluate) . ruby-mode))
 				    (Java . ((eUni-JavaAssert . eUni-JavaEvaluate) . java-mode)))
   "An a-list of language names and their respective assert functions.")
+(defvar   eUni-current-class-lessons '()
+  "The files of the next lessons for the particular class.")
 (defvar   eUni-current-lesson-buffer-name "*Lesson Name*"
   "The name of the buffer/window that will hold where the lesson will be written.")
 (defvar   eUni-current-lesson-language ""
@@ -27,8 +29,8 @@
 (defun eUni-start ()
   (interactive)
 
-  (when (not (file-exists-p eUni-LESSON-DIRECTORY))
-    (make-directory eUni-LESSON-DIRECTORY t))
+  (when (not (file-exists-p eUni-CLASSES-DIRECTORY))
+    (make-directory eUni-CLASSES-DIRECTORY t))
  
   (delete-other-windows)
 
@@ -58,48 +60,52 @@
 	    "begin a lesson!\n\n"))
 
   (let ((num 1))
-    (dolist (lesson (cddr (directory-files eUni-LESSON-DIRECTORY)))
+    (dolist (lesson (cddr (directory-files eUni-CLASSES-DIRECTORY)))
       (when (string-match "_lssn\\'" lesson)
 	(insert (concat "  " (number-to-string num) ". "))
+
 	(insert-button
 	  (replace-regexp-in-string "_lssn\\'" "" lesson)
 	  'action
 	  (lambda (x)
-	    (let ((class-dir (concat eUni-LESSON-DIRECTORY (button-get
-							     x 'lssn))))
-	      (eUni-load-class (concat
-				 class-dir
-				 "/"
-				 (caddr (directory-files class-dir))))))
+	    (setq eUni-current-class-lessons
+	      (cddr (directory-files (concat
+				       eUni-CLASSES-DIRECTORY
+				       (button-get x 'lssn)) t)))
+	    (eUni-load-class))
 	  'lssn
 	  lesson)
+
 	(insert "\n")
+
 	(setq num (1+ num)))))
 
   (turn-on-visual-line-mode)
 
   (setq buffer-read-only t))
 
-(defun eUni-load-class (class-file)
-  (let* ((commands     (with-temp-buffer
-			 (insert-file-contents class-file)
+(defun eUni-load-class ()
+  (let* ((lesson       (car eUni-current-class-lessons))
+	 (commands     (with-temp-buffer
+			 (insert-file-contents lesson)
 			 (split-string
 			   (buffer-string)
 			   eUni-CLASS-FILE-DELIMETER
 			   t)))
 	 (instructions (car  commands))
-	 (lesson       (cadr commands)))
-    (setq eUni-current-lesson-language (intern (file-name-extension class-file)))
+	 (lesson-code  (cadr commands)))
+    (setq eUni-current-class-lessons   (cdr eUni-current-class-lessons))
+    (setq eUni-current-lesson-language (intern (file-name-extension lesson)))
     (setq eUni-current-lesson-commands (cddr commands))
     (setq eUni-current-lesson-buffer-name
        (concat
 	 "*"
-	 (replace-regexp-in-string "[0-9]*_" "" (file-name-base class-file))
+	 (replace-regexp-in-string "[0-9]*_" "" (file-name-base lesson))
 	 "*"))
 
-    (eUni-load-lesson instructions lesson)))
+    (eUni-load-lesson instructions lesson-code)))
 
-(defun eUni-load-lesson (instructions lesson)
+(defun eUni-load-lesson (instructions lesson-code)
   (defun switch-erase-insert-toBeg (name contents)
     (switch-to-buffer name)
     (setq buffer-read-only nil)
@@ -120,7 +126,7 @@
   (setq buffer-read-only t)
   (split-window-vertically (floor (* .75 (window-height))))
 
-  (switch-erase-insert-toBeg eUni-current-lesson-buffer-name lesson)
+  (switch-erase-insert-toBeg eUni-current-lesson-buffer-name lesson-code)
   (funcall (eUni-get-language-emacs-mode eUni-current-lesson-language)))
 
 
@@ -139,11 +145,14 @@
 			 assertion))
 	      (eUni-generalEvaluate-init eUni-current-lesson-language)
 	      (message error-msg)
-	      (throw 'err)))
+	      (throw 'err t)))
 	(when (string-match "^EVALUATE " command)
 	  (eUni-generalEvaluate-init eUni-current-lesson-language)
 	  (message (substring command 5))
-	  (throw 'err))))))
+	  (throw 'err t)))))
+
+  (eUni-load-class))
+      
 
 (defun eUni-make-file-bash-safe (file)
   (replace-regexp-in-string " " "\\\\ " file))
